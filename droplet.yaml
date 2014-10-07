@@ -1,0 +1,153 @@
+---
+# these tasks are run from the local machine, so hosts must be "localhost"
+# (but does not have to be in the hosts inventory file) and connection must
+# be local
+- hosts: localhost
+  connection: local
+  tasks:
+    # the register step puts something like the following dict into the digitalocean variable:
+    #   {"changed": true, "ssh_key": {"id": 368199, "name": "Macbook.local"}}
+    - name: Deploy public key
+      digital_ocean: >
+        state=present
+        command=ssh
+        name=Macbook.local
+        ssh_pub_key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      register: digitalocean
+
+    # To print regions:
+    #   http get "https://api.digitalocean.com/regions?client_id=$DO_CLIENT_ID&api_key=$DO_API_KEY"
+    - name: Create Digital Ocean droplet size=512Mb image=Centos 7.0 x64 region=New York City 3
+      digital_ocean: >
+        state=present
+        command=droplet
+        name=mysterymachine
+        size_id=66
+        ssh_key_ids="{{ digitalocean.ssh_key.id }}"
+        region_id=8
+        image_id=6511101
+        unique_name=yes
+      register: digitalocean
+
+    # Register the Digital Ocean-assigned IP address with Ansible's inventory list
+    - name: Add new droplet to the hosts inventory
+      add_host: >
+        name="{{ digitalocean.droplet.ip_address }}"
+        groups=droplets
+
+    - name: Print WordPress installation instruction
+      debug: msg="Open http://{{ digitalocean.droplet.ip_address }}/wp-admin/install.php in your browser"
+
+- hosts: droplets
+  remote_user: root
+
+  # we only need a couple of services; mariadb (= MySQL) and httpd (= Apache2)
+  handlers:
+    - name: restart mariadb
+      service: >-
+        name=mariadb
+        state=restarted
+
+    - name: restart httpd
+      service: >-
+        name=httpd
+        state=restarted
+
+  tasks:
+    # - name: touch /tmp/ans01 file
+    #   shell: 'echo hayyyyy > /tmp/ans01'
+
+    # - name: >-
+    #     Set up password-less sudo for members of the "sudo" group; not
+    #     strictly necessary, but sometimes it's nice not to be treated like a
+    #     child at the command line.
+    #   lineinfile: >
+    #     state=present
+    #     line='%sudo ALL=(ALL) NOPASSWD:ALL'
+    #     dest=/etc/sudoers
+    #     validate='visudo -cf %s'
+
+    # MariaDB prep
+
+    - name: Install MariaDB
+      yum: name=mariadb-server
+      notify:
+        - restart mariadb
+
+    - name: Run MariaDB
+      service: >-
+        name=mariadb
+        enabled=true
+        state=started
+
+    - name: Install the MySQLdb python package to enable the mysql_db and mysql_user tasks
+      yum: name=MySQL-python
+
+    - name: Create MariaDB database "blog"
+      mysql_db: >-
+        name=blog
+
+    - name: Create MariaDB user "blog_user"
+      mysql_user: >-
+        name=blog_user
+        password="{{ lookup('password', 'tmp/mysql_blog_password length=10') }}"
+        priv=blog.*:ALL
+
+    # Apache2 prep
+
+    - name: Install Apache2
+      yum: name=httpd
+      notify:
+        - restart httpd
+
+    - name: Run Apache2
+      service: >-
+        name=httpd
+        enabled=true
+        state=started
+
+    # Wordpress prep
+
+    - name: Download wordpress-latest tarball
+      get_url: >-
+        url=https://wordpress.org/latest.tar.gz
+        dest=/tmp/wordpress-latest.tar.gz
+
+    - name: Extract wordpress-latest tarball
+      command: >-
+        creates=/var/www/html/wp-config-sample.php
+        /bin/tar --strip-components 1 -C /var/www/html/ -xf /tmp/wordpress-latest.tar.gz
+
+    # - name: Add group "wordpress"
+    #   group: >-
+    #     name=wordpress
+
+    # - name: Add user "wordpress"
+    #   user: >-
+    #     name=wordpress
+    #     group=wordpress
+    #     home=/srv/wordpress/
+
+    - name: Copy wp-config file to /var/www/html/
+      template: src=wp-config.php dest=/var/www/html/
+
+    - name: Change ownership of /var/www/html/
+      file: >-
+        path=/var/www/html/
+        owner=apache
+        group=apache
+        state=directory
+        recurse=yes
+
+    # Configure Apache2 to serve Wordpress via PHP
+
+    - name: Install PHP
+      yum: name=php
+      notify:
+        - restart httpd
+
+    - name: Install PHP's MySQL connector
+      yum: name=php-mysql
+
+    - name: Install PHP's graphics library
+      yum: name=php-gd
