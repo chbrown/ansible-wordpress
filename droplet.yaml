@@ -54,19 +54,6 @@
         state=restarted
 
   tasks:
-    # - name: touch /tmp/ans01 file
-    #   shell: 'echo hayyyyy > /tmp/ans01'
-
-    # - name: >-
-    #     Set up password-less sudo for members of the "sudo" group; not
-    #     strictly necessary, but sometimes it's nice not to be treated like a
-    #     child at the command line.
-    #   lineinfile: >
-    #     state=present
-    #     line='%sudo ALL=(ALL) NOPASSWD:ALL'
-    #     dest=/etc/sudoers
-    #     validate='visudo -cf %s'
-
     # MariaDB prep
 
     - name: Install MariaDB
@@ -117,16 +104,6 @@
       command: >-
         creates=/var/www/html/wp-config-sample.php
         /bin/tar --strip-components 1 -C /var/www/html/ -xf /tmp/wordpress-latest.tar.gz
-
-    # - name: Add group "wordpress"
-    #   group: >-
-    #     name=wordpress
-
-    # - name: Add user "wordpress"
-    #   user: >-
-    #     name=wordpress
-    #     group=wordpress
-    #     home=/srv/wordpress/
 
     - name: Copy wp-config file to /var/www/html/
       template: src=wp-config.php dest=/var/www/html/
