@@ -1,8 +1,6 @@
 ## Instructions
 
-## Install `ansible`
-
-**First**, install [homebrew](http://brew.sh/):
+**First**, install [homebrew](http://brew.sh/) if you haven't already:
 
     ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 
