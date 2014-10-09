@@ -31,9 +31,17 @@
 
     # Register the Digital Ocean-assigned IP address with Ansible's inventory list
     - name: Add new droplet to the hosts inventory
-      add_host: >
+      add_host: >-
         name="{{ digitalocean.droplet.ip_address }}"
         groups=droplets
+
+    - name: >-
+        Configure Digital Ocean DNS record to point from your Droplet's name .com to your droplet.
+        Of course you'll need to set your nameserver to ns1.digitalocean.com, too, via your
+        domain name registrar (like Namecheap, Gandi, etc.).
+      digital_ocean_domain: >-
+        name={{ digitalocean.droplet.name }}.com
+        ip={{ digitalocean.droplet.ip_address }}
 
     - name: Print WordPress installation instruction
       debug: msg="Open http://{{ digitalocean.droplet.ip_address }}/wp-admin/install.php in your browser"
@@ -54,6 +62,7 @@
         state=restarted
 
   tasks:
+
     # MariaDB prep
 
     - name: Install MariaDB
