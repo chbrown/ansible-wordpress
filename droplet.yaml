@@ -8,43 +8,44 @@
     # the register step puts something like the following dict into the digitalocean variable:
     #   {"changed": true, "ssh_key": {"id": 368199, "name": "Macbook.local"}}
     - name: Deploy public key
-      digital_ocean: >
-        state=present
-        command=ssh
-        name=Macbook.local
-        ssh_pub_key="{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
+      digital_ocean:
+        state: present
+        command: ssh
+        name: Macbook.local
+        ssh_pub_key: "{{ lookup('file', '~/.ssh/id_rsa.pub') }}"
       register: digitalocean
 
     # To print regions:
     #   http get "https://api.digitalocean.com/regions?client_id=$DO_CLIENT_ID&api_key=$DO_API_KEY"
     - name: Create Digital Ocean droplet size=512Mb image=Centos 7.0 x64 region=New York City 3
-      digital_ocean: >
-        state=present
-        command=droplet
-        name=mysterymachine
-        size_id=66
-        ssh_key_ids="{{ digitalocean.ssh_key.id }}"
-        region_id=8
-        image_id=6511101
-        unique_name=yes
+      digital_ocean:
+        state: present
+        command: droplet
+        name: mysterymachine
+        size_id: 66
+        ssh_key_ids: "{{ digitalocean.ssh_key.id }}"
+        region_id: 8
+        image_id: 6511101
+        unique_name: yes
       register: digitalocean
 
     # Register the Digital Ocean-assigned IP address with Ansible's inventory list
     - name: Add new droplet to the hosts inventory
-      add_host: >-
-        name="{{ digitalocean.droplet.ip_address }}"
-        groups=droplets
+      add_host:
+        name: "{{ digitalocean.droplet.ip_address }}"
+        groups: droplets
 
     - name: >-
         Configure Digital Ocean DNS record to point from your Droplet's name .com to your droplet.
         Of course you'll need to set your nameserver to ns1.digitalocean.com, too, via your
         domain name registrar (like Namecheap, Gandi, etc.).
-      digital_ocean_domain: >-
-        name={{ digitalocean.droplet.name }}.com
-        ip={{ digitalocean.droplet.ip_address }}
+      digital_ocean_domain:
+        name: "{{ digitalocean.droplet.name }}.com"
+        ip: "{{ digitalocean.droplet.ip_address }}"
 
     - name: Print WordPress installation instruction
-      debug: msg="Open http://{{ digitalocean.droplet.ip_address }}/wp-admin/install.php in your browser"
+      debug:
+        msg: "Open http://{{ digitalocean.droplet.ip_address }}/wp-admin/install.php in your browser"
 
 - hosts: droplets
   remote_user: root
@@ -52,88 +53,96 @@
   # we only need a couple of services; mariadb (= MySQL) and httpd (= Apache2)
   handlers:
     - name: restart mariadb
-      service: >-
-        name=mariadb
-        state=restarted
+      service:
+        name: mariadb
+        state: restarted
 
     - name: restart httpd
-      service: >-
-        name=httpd
-        state=restarted
+      service:
+        name: httpd
+        state: restarted
 
   tasks:
 
     # MariaDB prep
 
     - name: Install MariaDB
-      yum: name=mariadb-server
+      yum:
+        name: mariadb-server
       notify:
         - restart mariadb
 
     - name: Run MariaDB
-      service: >-
-        name=mariadb
-        enabled=true
-        state=started
+      service:
+        name: mariadb
+        enabled: true
+        state: started
 
     - name: Install the MySQLdb python package to enable the mysql_db and mysql_user tasks
-      yum: name=MySQL-python
+      yum:
+        name: MySQL-python
 
     - name: Create MariaDB database "blog"
-      mysql_db: >-
-        name=blog
+      mysql_db:
+        name: blog
 
     - name: Create MariaDB user "blog_user"
-      mysql_user: >-
-        name=blog_user
-        password="{{ lookup('password', 'tmp/mysql_blog_password length=10') }}"
-        priv=blog.*:ALL
+      mysql_user:
+        name: blog_user
+        password: "{{ lookup('password', 'tmp/mysql_blog_password length=10') }}"
+        priv: "blog.*:ALL"
 
     # Apache2 prep
 
     - name: Install Apache2
-      yum: name=httpd
+      yum:
+        name: httpd
       notify:
         - restart httpd
 
     - name: Run Apache2
-      service: >-
-        name=httpd
-        enabled=true
-        state=started
+      service:
+        name: httpd
+        enabled: true
+        state: started
 
     # Wordpress prep
 
     - name: Download wordpress-latest tarball
-      get_url: >-
-        url=https://wordpress.org/latest.tar.gz
-        dest=/tmp/wordpress-latest.tar.gz
+      get_url:
+        url: https://wordpress.org/latest.tar.gz
+        dest: /tmp/wordpress-latest.tar.gz
 
     - name: Extract wordpress-latest tarball
-      command: >-
-        creates=/var/www/html/wp-config-sample.php
-        /bin/tar --strip-components 1 -C /var/www/html/ -xf /tmp/wordpress-latest.tar.gz
+      args:
+        creates: /var/www/html/wp-config-sample.php
+      command: "/bin/tar --strip-components 1 -C /var/www/html/ -xf /tmp/wordpress-latest.tar.gz"
 
     - name: Copy wp-config file to /var/www/html/
-      template: src=wp-config.php dest=/var/www/html/
+      template:
+        src: wp-config.php
+        dest: /var/www/html/
 
     - name: Change ownership of /var/www/html/
-      file: >-
-        path=/var/www/html/
-        owner=apache
-        group=apache
-        state=directory
-        recurse=yes
+      file:
+        path: /var/www/html/
+        owner: apache
+        group: apache
+        state: directory
+        recurse: yes
 
     # Configure Apache2 to serve Wordpress via PHP
 
     - name: Install PHP
-      yum: name=php
+      yum:
+        name: php
       notify:
         - restart httpd
 
     - name: Install PHP's MySQL connector
-      yum: name=php-mysql
+      yum:
+        name: php-mysql
 
     - name: Install PHP's graphics library
-      yum: name=php-gd
+      yum:
+        name: php-gd
